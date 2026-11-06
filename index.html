@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LSPD Command Center - النظام الموحد للراديو ورستر الأفراد</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Cairo & Tajawal & Montserrat -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- SheetJS for Excel Upload/Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#0b0f17',
+                        cardBg: '#131b2a',
+                        borderBg: '#1e293b',
+                        accentBlue: '#2563eb',
+                        accentGold: '#f59e0b',
+                        accentRed: '#ef4444'
+                    },
+                    fontFamily: {
+                        cairo: ['Cairo', 'sans-serif'],
+                        tajawal: ['Tajawal', 'sans-serif'],
+                        mono: ['Courier New', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            font-family: 'Cairo', 'Tajawal', sans-serif;
+            background-color: #0b0f17;
+            color: #e2e8f0;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #0b0f17;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #334155;
+        }
+
+        .code-red {
+            color: #f87171;
+            font-weight: 700;
+        }
+
+        .tab-btn.active {
+            background-color: #1d4ed8;
+            color: #ffffff;
+            border-color: #3b82f6;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#0b0f17] text-slate-100">
+
+    <!-- Header & Navigation Bar -->
+    <header class="bg-[#131b2a] border-b border-slate-800 sticky top-0 z-40 shadow-xl">
+        <div class="max-w-[1800px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+            
+            <!-- Logo & Brand Title -->
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-full bg-gradient-to-tr from-blue-900 to-amber-500 p-0.5 shadow-md flex items-center justify-center">
+                    <div class="w-full h-full bg-[#0b0f17] rounded-full flex items-center justify-center">
+                        <i class="fa-solid fa-shield-halved text-amber-400 text-xl"></i>
+                    </div>
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-wide text-white flex items-center gap-2">
+                        <span>LOS SANTOS POLICE DEPARTMENT</span>
+                        <span class="text-xs px-2 py-0.5 rounded bg-blue-900/70 text-blue-300 border border-blue-700/50">SYSTEM HUB</span>
+                    </h1>
+                    <p class="text-xs text-amber-400/90 font-semibold">نظام التحكم الموحد: جدول الأفراد وبروتوكولات الراديو</p>
+                </div>
+            </div>
+
+            <!-- Main Tab Switcher -->
+            <div class="flex items-center bg-[#0b0f17] p-1.5 rounded-xl border border-slate-800 gap-1.5">
+                <button id="tab-roster-btn" onclick="switchTab('roster')" class="tab-btn active px-5 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 border border-transparent text-slate-300 hover:text-white">
+                    <i class="fa-solid fa-users-viewfinder"></i>
+                    <span>جدول الأفراد (Roster Table)</span>
+                </button>
+                <button id="tab-protocols-btn" onclick="switchTab('protocols')" class="tab-btn px-5 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 border border-transparent text-slate-300 hover:text-white">
+                    <i class="fa-solid fa-walkie-talkie"></i>
+                    <span>بروتوكولات الراديو (Radio Codes)</span>
+                </button>
+            </div>
+
+            <!-- Admin Status & Global Controls -->
+            <div class="flex items-center gap-3">
+                <div id="authStatusBadge" class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#0b0f17] text-slate-300 border border-slate-800">
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500" id="statusDot"></span>
+                    <span id="statusText">وضع العرض (قراءة فقط)</span>
+                </div>
+
+                <button id="authBtn" onclick="toggleAdminAuth()" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all duration-200 shadow-md">
+                    <i class="fa-solid fa-lock" id="authBtnIcon"></i>
+                    <span id="authBtnText">دخول المشرف</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-6 left-6 z-50 bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-xl shadow-2xl translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-3">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+        <span id="toastMsg" class="text-xs font-semibold">تم العملية بنجاح</span>
+    </div>
+
+    <!-- MAIN CONTAINER -->
+    <main class="max-w-[1800px] mx-auto px-4 py-6 flex-grow w-full space-y-6">
+
+        <!-- ==================== SECTION 1: LSPD ROSTER TABLE ==================== -->
+        <section id="section-roster" class="space-y-4">
+            
+            <!-- Controls & Tools Bar -->
+            <div class="bg-[#131b2a] border border-slate-800 rounded-xl p-4 shadow-lg space-y-3">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    
+                    <!-- Search & Filter Controls -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-grow max-w-4xl">
+                        <div class="relative">
+                            <i class="fa-solid fa-magnifying-glass absolute right-3.5 top-3 text-slate-500 text-xs"></i>
+                            <input type="text" id="roster-search" oninput="renderRosterTable()" placeholder="بحث بالاسم، الكود، Discord ID..." class="w-full bg-[#0b0f17] border border-slate-700 rounded-lg pr-9 pl-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <select id="roster-filter-rank" onchange="renderRosterTable()" class="w-full bg-[#0b0f17] border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+                                <option value="">جميع الرتب (All Ranks)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <select id="roster-filter-admin" onchange="renderRosterTable()" class="w-full bg-[#0b0f17] border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+                                <option value="">جميع مناصب الإدارة</option>
+                                <option value="NONE">بدون منصب (NONE)</option>
+                                <option value="SPECIAL">مناصب خاصة فقط</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Quick Roster Admin Actions -->
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <div id="roster-admin-actions" class="hidden items-center gap-2">
+                            <button onclick="openRosterModal()" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs px-3.5 py-2 rounded-lg transition-all flex items-center gap-1.5 shadow-md">
+                                <i class="fa-solid fa-user-plus"></i>
+                                <span>إضافة فرد</span>
+                            </button>
+                            <button onclick="resetNamesToVacant()" class="bg-amber-950/80 hover:bg-amber-900 text-amber-300 border border-amber-800/80 text-xs px-3.5 py-2 rounded-lg transition-all flex items-center gap-1.5" title="تفريغ الأسماء">
+                                <i class="fa-solid fa-user-slash"></i>
+                                <span>تفريغ الأسماء</span>
+                            </button>
+                            <button onclick="clearAllRosterData()" class="bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800/80 text-xs px-3.5 py-2 rounded-lg transition-all flex items-center gap-1.5">
+                                <i class="fa-solid fa-trash-can"></i>
+                                <span>مسح الجدول</span>
+                            </button>
+                            <label class="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs px-3.5 py-2 rounded-lg transition-all flex items-center gap-1.5">
+                                <i class="fa-solid fa-file-import text-amber-400"></i>
+                                <span>استيراد</span>
+                                <input type="file" id="roster-file-input" accept=".csv, .tsv, .txt, .xlsx, .xls" class="hidden" onchange="handleRosterFileUpload(event)">
+                            </label>
+                        </div>
+
+                        <!-- Export Options -->
+                        <div class="relative inline-block text-left" id="export-dropdown-container">
+                            <button onclick="toggleExportMenu()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs px-3.5 py-2 rounded-lg transition-all flex items-center gap-1.5">
+                                <i class="fa-solid fa-file-export text-emerald-400"></i>
+                                <span>تصدير البيانات</span>
+                                <i class="fa-solid fa-chevron-down text-[10px] mr-1"></i>
+                            </button>
+                            <div id="export-menu" class="hidden absolute left-0 mt-2 w-48 rounded-lg bg-[#131b2a] border border-slate-700 shadow-xl z-50 py-1">
+                                <button onclick="exportToExcel()" class="w-full text-right px-4 py-2 text-xs hover:bg-slate-800 text-slate-200 flex items-center justify-between">
+                                    <span>ملف إكسل (Excel)</span>
+                                    <i class="fa-solid fa-file-excel text-emerald-400"></i>
+                                </button>
+                                <button onclick="exportToCSV()" class="w-full text-right px-4 py-2 text-xs hover:bg-slate-800 text-slate-200 flex items-center justify-between">
+                                    <span>ملف نصي (CSV)</span>
+                                    <i class="fa-solid fa-file-csv text-blue-400"></i>
+                                </button>
+                                <button onclick="copyToClipboard()" class="w-full text-right px-4 py-2 text-xs hover:bg-slate-800 text-slate-200 flex items-center justify-between border-t border-slate-800">
+                                    <span>نسخ الحافظة</span>
+                                    <i class="fa-solid fa-copy text-amber-400"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <button onclick="window.print()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs px-3 py-2 rounded-lg transition-all flex items-center gap-1.5">
+                            <i class="fa-solid fa-print text-amber-400"></i>
+                            <span>طباعة</span>
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Roster Main Table -->
+            <div class="bg-[#131b2a] border border-slate-800 rounded-xl overflow-hidden shadow-2xl">
+                <div class="overflow-x-auto custom-scrollbar min-h-[500px]">
+                    <table class="w-full text-right text-xs border-collapse">
+                        <thead class="bg-[#0b0f17] text-slate-400 uppercase font-mono text-[11px] border-b border-slate-800 sticky top-0 z-10">
+                            <tr>
+                                <th class="py-3 px-3 text-center border-l border-slate-800/60 w-16">الكود</th>
+                                <th class="py-3 px-3 border-l border-slate-800/60 min-w-[150px]">اسم الديسكورد (Discord Name)</th>
+                                <th class="py-3 px-3 text-center border-l border-slate-800/60 w-16">الرتبة</th>
+                                <th class="py-3 px-3 text-center border-l border-slate-800/60 w-24">النقاط</th>
+                                <th class="py-3 px-3 text-center border-l border-slate-800/60 min-w-[120px]">Sector / Teams</th>
+                                <th class="py-3 px-3 border-l border-slate-800/60 min-w-[180px]">Administrator Ranks</th>
+                                <th class="py-3 px-3 text-center border-l border-slate-800/60">FTO</th>
+                                <th class="py-3 px-3 text-center border-l border-slate-800/60">Int</th>
+                                <th class="py-3 px-3 text-center border-l border-slate-800/60">Air</th>
+                                <th class="py-3 px-3 text-center border-l border-slate-800/60">Moto</th>
+                                <th class="py-3 px-3 text-center border-l border-slate-800/60">Nego</th>
+                                <th class="py-3 px-3 border-l border-slate-800/60 font-mono min-w-[170px]">DISCORD ID</th>
+                                <th id="th-roster-actions" class="py-3 px-3 text-center w-24 hidden">إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="roster-tbody" class="divide-y divide-slate-800/60">
+                            <!-- Dynamic Content -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== SECTION 2: RADIO PROTOCOLS ==================== -->
+        <section id="section-protocols" class="space-y-6 hidden">
+            
+            <!-- Protocol Header & Controls -->
+            <div class="bg-[#131b2a] border border-slate-800 rounded-xl p-4 shadow-lg flex flex-col sm:flex-row gap-4 items-center justify-between">
+                
+                <div class="relative w-full sm:w-96">
+                    <i class="fa-solid fa-magnifying-glass absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                    <input type="text" id="protocol-search" oninput="renderProtocolsUI()" placeholder="ابحث برقم الكود، النطق أو المعنى..." 
+                           class="w-full bg-[#0b0f17] border border-slate-700 rounded-lg pr-10 pl-4 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500 transition placeholder-slate-500">
+                </div>
+
+                <div class="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-4">
+                    <div class="text-xs text-slate-400 font-semibold">
+                        إجمالي الأكواد: <span id="totalCodesCount" class="font-bold text-amber-400">0</span>
+                    </div>
+
+                    <div id="protocol-admin-actions" class="hidden items-center gap-2">
+                        <button onclick="openAddCategoryModal()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition flex items-center gap-1">
+                            <i class="fa-solid fa-folder-plus text-amber-400"></i> قسم جديد
+                        </button>
+                        <button onclick="openProtocolModal()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1">
+                            <i class="fa-solid fa-plus"></i> إضافة كود
+                        </button>
+                        <button onclick="resetProtocolsToDefaults()" title="استعادة الأكواد الأصلية" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-950 text-rose-400 border border-rose-900/50 text-xs font-bold transition">
+                            <i class="fa-solid fa-rotate-right"></i> ضبط مصنعي
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Protocols Category Tables Container -->
+            <div id="protocolsContainer" class="space-y-6">
+                <!-- Data will be dynamically rendered here -->
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-[#131b2a] border-t border-slate-800 py-4 text-center text-xs text-slate-500 mt-auto">
+        <p>LSPD SYSTEM HUB &copy; 2026 جميع الحقوق محفوظة - قسم الدسباتش والأفراد</p>
+    </footer>
+
+    <!-- ==================== MODALS ==================== -->
+
+    <!-- Password Auth Modal -->
+    <div id="passwordModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-[#131b2a] border border-slate-800 w-full max-w-md rounded-xl p-6 shadow-2xl relative">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-shield-halved text-blue-500"></i> تسجيل دخول المشرف
+                </h3>
+                <button onclick="closePasswordModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">كلمة المرور الخاصة بالمشرف:</label>
+                    <input type="password" id="adminPasswordInput" onkeypress="if(event.key==='Enter') submitAdminAuth()" placeholder="••••••••" class="w-full bg-[#0b0f17] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
+                    <p id="passwordError" class="text-xs text-red-500 mt-1.5 hidden">كلمة السر غير صحيحة! (الافتراضية: lspd2026)</p>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button onclick="closePasswordModal()" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold">إلغاء</button>
+                    <button onclick="submitAdminAuth()" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold">تسجيل الدخول</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Roster Add / Edit Modal -->
+    <div id="rosterModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-[#131b2a] border border-slate-700 rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-[#0b0f17]">
+                <h3 id="roster-modal-title" class="text-sm font-bold text-amber-400 flex items-center gap-2">
+                    <i class="fa-solid fa-user-pen"></i>
+                    <span>تعديل بيانات الفرد</span>
+                </h3>
+                <button onclick="closeRosterModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form id="roster-form" onsubmit="handleRosterFormSubmit(event)" class="p-5 space-y-4 overflow-y-auto custom-scrollbar flex-grow text-xs">
+                <input type="hidden" id="roster-edit-id">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-slate-400 mb-1">الرتبة العسكرية *</label>
+                        <select id="form-rank" required class="w-full bg-[#0b0f17] border border-slate-700 rounded-lg px-3 py-2 text-slate-200"></select>
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">الكود *</label>
+                        <input type="text" id="form-code" required class="w-full bg-[#0b0f17] border border-slate-700 rounded-lg px-3 py-2 text-slate-200">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">اسم الديسكورد</label>
+                        <input type="text" id="form-name" class="w-full bg-[#0b0f17] border border-slate-700 rounded-lg px-3 py-2 text-slate-200">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">Discord ID</label>
+                        <input type="text" id="form-discord-id" class="w-full bg-[#0b0f17] border border-slate-700 font-mono rounded-lg px-3 py-2 text-slate-200">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">أيقونة الرتبة</label>
+                        <input type="text" id="form-rank-icon" class="w-full bg-[#0b0f17] border border-slate-700 rounded-lg px-3 py-2 text-slate-200">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">النقاط</label>
+                        <input type="text" id="form-points" class="w-full bg-[#0b0f17] border border-slate-700 rounded-lg px-3 py-2 text-slate-200">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">القطاع / الفريق</label>
+                        <input type="text" id="form-sector" class="w-full bg-[#0b0f17] border border-slate-700 rounded-lg px-3 py-2 text-slate-200">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">المنصب الإداري</label>
+                        <input type="text" id="form-admin-rank" class="w-full bg-[#0b0f17] border border-slate-700 rounded-lg px-3 py-2 text-slate-200">
+                    </div>
+                </div>
+                <div class="border-t border-slate-800 pt-3 mt-2">
+                    <label class="block text-slate-300 font-bold mb-2">الشهادات والدورات:</label>
+                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 bg-[#0b0f17] p-3 rounded-lg border border-slate-800">
+                        <label class="flex items-center space-x-2 space-x-reverse cursor-pointer"><input type="checkbox" id="form-fto"><span>FTO</span></label>
+                        <label class="flex items-center space-x-2 space-x-reverse cursor-pointer"><input type="checkbox" id="form-interceptor"><span>Interceptor</span></label>
+                        <label class="flex items-center space-x-2 space-x-reverse cursor-pointer"><input type="checkbox" id="form-airship"><span>AirShip</span></label>
+                        <label class="flex items-center space-x-2 space-x-reverse cursor-pointer"><input type="checkbox" id="form-motorcycle"><span>Motorcycle</span></label>
+                        <label class="flex items-center space-x-2 space-x-reverse cursor-pointer"><input type="checkbox" id="form-negotiation"><span>Negotiation</span></label>
+                    </div>
+                </div>
+                <div class="border-t border-slate-800 pt-4 flex items-center justify-end gap-2">
+                    <button type="button" onclick="closeRosterModal()" class="bg-slate-800 text-slate-300 px-4 py-2 rounded-lg text-xs font-semibold">إلغاء</button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-5 py-2 rounded-lg text-xs">حفظ البيانات</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Protocol Add / Edit Modal -->
+    <div id="protocolModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-[#131b2a] border border-slate-800 w-full max-w-lg rounded-xl p-6 shadow-2xl relative">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+                <h3 id="protocolModalTitle" class="text-base font-bold text-white">إضافة كود جديد</h3>
+                <button onclick="closeProtocolModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            
+            <form id="protocolForm" onsubmit="saveProtocolForm(event)" class="space-y-4 text-xs">
+                <input type="hidden" id="editCategoryIndex">
+                <input type="hidden" id="editCodeIndex">
+
+                <div>
+                    <label class="block font-medium text-slate-400 mb-1">القسم</label>
+                    <select id="modalCategorySelect" class="w-full bg-[#0b0f17] border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"></select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-medium text-slate-400 mb-1">رمز البلاغ / الكود</label>
+                        <input type="text" id="modalCode" required placeholder="مثال: Code 0 أو 10-4" class="w-full bg-[#0b0f17] border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block font-medium text-slate-400 mb-1">طريقة النطق</label>
+                        <input type="text" id="modalPronunciation" placeholder="مثال: كود زيرو / تن-فور" class="w-full bg-[#0b0f17] border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-medium text-slate-400 mb-1">المعنى / التوصيف</label>
+                    <textarea id="modalMeaning" rows="2" placeholder="أدخل تفاصيل المعنى..." class="w-full bg-[#0b0f17] border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"></textarea>
+                </div>
+
+                <div>
+                    <label class="block font-medium text-slate-400 mb-1">مثال الاستخدام</label>
+                    <textarea id="modalExample" rows="2" placeholder="مثال: (يولت) تو دسباتش..." class="w-full bg-[#0b0f17] border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"></textarea>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                    <button type="button" onclick="closeProtocolModal()" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold">إلغاء</button>
+                    <button type="submit" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold">حفظ الكود</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Rename Category Modal -->
+    <div id="renameCategoryModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-[#131b2a] border border-slate-800 w-full max-w-md rounded-xl p-6 shadow-2xl relative">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+                <h3 class="text-base font-bold text-white">تعديل اسم القسم</h3>
+                <button onclick="closeRenameCategoryModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="space-y-4 text-xs">
+                <input type="hidden" id="renameCategoryIndex">
+                <div>
+                    <label class="block font-medium text-slate-400 mb-1">اسم القسم الجديد:</label>
+                    <input type="text" id="renameCategoryInput" class="w-full bg-[#0b0f17] border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button onclick="closeRenameCategoryModal()" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold">إلغاء</button>
+                    <button onclick="saveCategoryName()" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold">حفظ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- APPLICATION LOGIC JS -->
+    <script>
+        // ================= Global State & Initial Data =================
+
+        let activeTab = 'roster';
+        let isAdminUnlocked = false;
+        let adminPasscode = localStorage.getItem('LSPD_ADMIN_PASSCODE') || 'lspd2026';
+
+        // Official Ranks Hierarchy Order
+        const RANKS_ORDER = [
+            "Police Chief",
+            "Deputy of Police Chief",
+            "General",
+            "Colonel",
+            "Major",
+            "Captain",
+            "First Lieutenant",
+            "Lieutenant",
+            "Staff Sergeant",
+            "First Sergeant",
+            "Sergeant",
+            "Senior Officer",
+            "Officer III",
+            "Officer II",
+            "Officer I",
+            "Solo Cadet",
+            "Cadet"
+        ];
+
+        // Initial Roster Data
+        const initialRosterDataset = `Code\tDiscord Name\tRank Icon\tRank\tV.P\tLast Promotion\tPoints\tSector or Teams\tAdministrator Ranks\tFTO\tInterceptor\tAirShip\tMotorcycle\tNegotiation\tDISCORD ID
+Police Chief
+C-0\tشاغر\t★★★★★\t\t\t\t\t\t\t\t\t\t\t\t228003051779260418
+Deputy of Police Chief
+C-1\tشاغر\t★★★★\t\t\t\t\t\t\t\t\t\t\t\t1098133985856589854
+General
+G-0\tشاغر\t🪖\t\t\t\t\t\t\t\t\t\t\t\t1072108795369945108
+Colonel
+C-2\tشاغر\t🪖\t\t\t\t\t\t\t\t\t\t\t\t
+Major
+C-3\tشاغر\t🪖\t\t\t\t\t\t\t\t\t\t\t\t
+C-4\tشاغر\t🪖\t\t\t\t\t\t\t\t\t\t\t\t
+Captain
+C-5\tشاغر\t❚❚\t\t\t\t\t\t\t\t\t\t\t\t
+C-6\tشاغر\t❚❚\t\t\t\t\t\t\t\t\t\t\t\t
+First Lieutenant
+C-7\tشاغر\t❚\t\tإثبات جدارة\t\tPolice Academy Commander\t✔\t✔\t✔\t✔\t✔\t11342997B2888314349
+C-8\tشاغر\t❚\t\tإثبات جدارة\t\tNONE\t\t\t\t\t\t
+C-9\tشاغر\t❚\t\tإثبات جدارة\t\tNONE\t\t\t\t\t\t
+Lieutenant
+C-10\tشاغر\t▮\t\tإثبات جدارة\t\tNONE\t\t\t\t\t\t
+C-11\tشاغر\t▮\t\tإثبات جدارة\t\tHead of Internal Affairs\t✔\t✔\t✔\t✔\t✔\t1045110383808028387
+C-12\tشاغر\t▮\t\tإثبات جدارة\t\tNONE\t\t\t\t\t\t
+Staff Sergeant
+U-1\tشاغر\t3\t\t3000\t\tNONE\t\t\t\t\t\t1492807518460733177
+U-2\tشاغر\t3\t\t3000\t\tNONE\t\t\t\t\t\t
+U-3\tشاغر\t3\t\t3000\t\tNONE\t\t\t\t\t\t
+U-4\tشاغر\t3\t\t3000\t\tNONE\t\t\t\t\t\t
+First Sergeant
+U-5\tشاغر\t2\t\t2000\t\t★ S.W.AT INSTRUCTOR ★\t✔\t✔\t✔\t✔\t✔\t1428898217B3588E101
+U-6\tشاغر\t2\t\t2000\t\tNONE\t\t\t\t\t\t1185408211072409801
+U-7\tشاغر\t2\t\t2000\t\tNONE\t\t\t\t\t\t
+U-8\tشاغر\t2\t\t2000\t\tNONE\t\t\t\t\t\t
+U-9\tشاغر\t2\t\t2000\t\tNONE\t\t\t\t\t\t
+U-10\tشاغر\t2\t\t2000\t\tNONE\t\t\t\t\t\t
+U-11\tشاغر\t2\t\t2000\t\tNONE\t\t\t\t\t\t
+Sergeant
+U-12\tشاغر\t1\t\t1000\t\tPolice Academy Deputy\t✔\t✔\t✔\t✔\t✔\t9E739B837E815435B6
+U-13\tشاغر\t1\t\t1000\t\tNONE\t\t\t\t\t\t1408891382214761484
+U-14\tشاغر\t1\t\t1000\t\tPolice Wings Commander\t✔\t✔\t✔\t✔\t✔\t138B71423B6803E5F42
+U-15\tشاغر\t1\t\t1000\t\tNONE\t\t\t\t\t\t
+U-23\tشاغر\t^\t\t350\t\tNONE\t\t\t\t\t\t1160838633383945778
+U-24\tشاغر\t^\t\t300\t\tNONE\t\t\t\t\t\t110879888288343585
+U-25\tشاغر\t^\t\t300\t\tNONE\t\t\t\t\t\t1382857272487304881
+U-26\tشاغر\t^\t\t300\t\tNONE\t\t\t\t\t\t1382867272487304981
+U-27\tشاغر\t^\t\t300\t\tNONE\t\t\t\t\t\t1313088847467357807
+U-28\tشاغر\t^\t\t300\t\tDispatch Commander\t\t\t\t\t\t
+U-29\tشاغر\t^\t\t300\t\tNONE\t\t\t\t\t\t
+U-40\tشاغر\t^\t\t300\t\tNONE\t\t\t\t\t\t
+U-41\tشاغر\t^\t\t300\t\tNONE\t\t\t\t\t\t
+Senior Officer
+U-30\tشاغر\t-\t\t200\t\tNONE\t\t\t\t\t\t
+Officer III
+U-31\tشاغر\t-\t\t150\t\tNONE\t\t\t\t\t\t
+Officer II
+U-32\tشاغر\t-\t\t130\t\tNONE\t\t\t\t\t\t
+Officer I
+U-42\tشاغر\t-\t\t110\t\tNONE\t\t\t\t\t\t1383376274186424988
+U-43\tشاغر\t-\t\t110\t\tNONE\t\t\t\t\t\t924627258688286723
+U-44\tشاغر\t-\t\t110\t\tNONE\t\t\t\t\t\t838795858302078418
+U-45\tشاغر\t-\t\t110\t\tNONE\t\t\t\t\t\t
+U-46\tشاغر\t-\t\t110\t\tNONE\t\t\t\t\t\t
+U-47\tشاغر\t-\t\t110\t\tNONE\t\t\t\t\t\t1328071115813282804
+Solo Cadet
+U-48\tشاغر\t-\t\t90\t\tNONE\t\t\t\t\t\t1619022404150628447
+U-49\tشاغر\t-\t\t90\t\tNONE\t\t\t\t\t\t111813278289408154
+U-50\tشاغر\t-\t\t90\t\tNONE\t\t\t\t\t\t1359102688339083847
+U-51\tشاغر\t-\t\t90\t\tNONE\t\t\t\t\t\t1336019883768181882
+U-52\tشاغر\t-\t\t90\t\tNONE\t\t\t\t\t\t1355576264886321484
+Cadet
+400\tشاغر\t\t\tإثبات جدارة\t\tNONE\t\t\t\t\t\t1383871441383320973
+401\tشاغر\t\t\tإثبات جدارة\t\tNONE\t\t\t\t\t\t1539653279328341831
+402\tشاغر\t\t\tإثبات جدارة\t\tNONE\t\t\t\t\t\t1272478894084213840
+403\tشاغر\t\t\tإثبات جدارة\t\tNONE\t\t\t\t\t\t1328071115813282804
+404\tشاغر\t\t\tإثبات جدارة\t\tNONE\t\t\t\t\t\t1287478894084212840
+405\tشاغر\t\t\tإثبات جدارة\t\tNONE\t\t\t\t\t\t1610849079236170308
+406\tشاغر\t\t\tإثبات جدارة\t\tNONE\t\t\t\t\t\t1423072328438517780
+407\tشاغر\t\t\tإثبات جدارة\t\tNONE\t\t\t\t\t\t1207763433722684739
+408\tشاغر\t\t\tإثبات جدارة\t\tNONE\t\t\t\t\t\t1343601548105238634
+409\tشاغر\t\t\tإثبات جدارة\t\tNONE\t\t\t\t\t\t135241288638838828
+410\tشاغر\t\t\tإثبات جدارة\t\tNONE\t\t\t\t\t\t1343603421243918311
+411\tشاغر\t\t\tإثبات جدارة\t\tNONE\t\t\t\t\t\t1232261706794484614
+412\tشاغر\t\t\tإثبات جدارة\t\tNONE\t\t\t\t\t\t894082816371358838
+413\tشاغر\t\t\tإثبات جدارة\t\tNONE\t\t\t\t\t\t1218682620978908037
+414\tشاغر\t\t\tإثبات جدارة\t\tNONE\t\t\t\t\t\t767513832681342178
+415\tشاغر\t\t\tإثبات جدارة\t\tNONE\t\t\t\t\t\t133823218282630456`;
+
+        // Initial Radio Protocols Data
+        const initialProtocolsDataset = [
+            {
+                categoryTitle: "الأكواد الجانبية",
+                codes: [
+                    { code: "Code 0", pronunciation: "كود زيرو", meaning: "عموم الوحدات توجه للحالة (استنفار امني)", example: "<span class='code-red'>دسباتش لعموم الوحدات Code 0</span>" },
+                    { code: "Code 1", pronunciation: "كود ون", meaning: "بدون نور وصوت", example: "-" },
+                    { code: "Code 2", pronunciation: "كود تو", meaning: "مع نور ونحن بدون صوت السيرين", example: "-" },
+                    { code: "Code 3", pronunciation: "كود ثري", meaning: "مع نور وصوت السيرين", example: "-" },
+                    { code: "Code 4", pronunciation: "كود فور", meaning: "المكان امن وخالي", example: "<span class='code-red'>( يونت ) تو دسباتش لاست شوت فاير Code 4</span>" },
+                    { code: "Code 6", pronunciation: "كود سكس", meaning: "جاري التحقق من المكان او الحالة والتفتيش بالمنطقة", example: "<span class='code-red'>( يونت ) تو دسباتش لاست شوت فاير Code 6 حاليا</span>" },
+                    { code: "Code 7", pronunciation: "كود سفن", meaning: "مسح البصمات وتصوير مسرح الجريمة ورفع تقرير", example: "<span class='code-red'>( يونت ) تو دسباتش لاست 10-7 Code 7</span>" },
+                    { code: "0-1", pronunciation: "زيرو ون", meaning: "استراحه او تسجيل خروج مؤقت", example: "<span class='code-red'>( يونت ) تو دسباتش 0-1 لمدة 10 دقائق</span>" },
+                    { code: "0-2", pronunciation: "زيرو تو", meaning: "الاشاره واضحه", example: "<span class='code-red'>دسباتش تو ( يونت ) 0-2 , 0-3</span>" },
+                    { code: "0-3", pronunciation: "زيرو ثري", meaning: "التأكد من اشارة الراديو", example: "<span class='code-red'>( يونت ) تو دسباتش 0-3</span>" },
+                    { code: "0-4", pronunciation: "زيرو فور", meaning: "علم البلاغ", example: "<span class='code-red'>( يونت ) تو دسباتش 0-4 اخر بلاغ</span>" },
+                    { code: "0-5", pronunciation: "زيرو فايف", meaning: "الشرطي مشغول", example: "<span class='code-red'>( يونت ) تو دسباتش 0-5 يوجد لدي حالة</span>" },
+                    { code: "0-6", pronunciation: "زيرو سكس", meaning: "كرر البلاغ", example: "<span class='code-red'>( يونت ) تو دسباتش 0-6 اخر بلاغ</span>" },
+                    { code: "0-7", pronunciation: "زيرو سفن", meaning: "تسجيل خروج", example: "<span class='code-red'>( يونت ) تو دسباتش 0-7</span>" },
+                    { code: "0-8", pronunciation: "زيرو ايت", meaning: "تسجيل دخول", example: "<span class='code-red'>( يونت ) تو دسباتش 0-8 لتوجيهاتك</span>" }
+                ]
+            },
+            {
+                categoryTitle: "الأكواد مهمة",
+                codes: [
+                    { code: "10-0", pronunciation: "تن زيرو", meaning: "الشرطي بحاجه لمسعف", example: "<span class='code-red'>( يونت ) تو دسباتش 10-0 بتوجه لموجة 6</span>" },
+                    { code: "10-1", pronunciation: "تن - ون", meaning: "مطاردة مركبة", example: "<span class='code-red'>( يونت ) تو دسباتش 10-1 مع ( مواصفات المركبه )</span>" },
+                    { code: "10-2", pronunciation: "تن - تو", meaning: "غير صحيح", example: "-" },
+                    { code: "10-3", pronunciation: "تن - ثري", meaning: "استيقاف مروري", example: "<span class='code-red'>( يونت ) تو دسباتش 10-3 مع ( مواصفات المركبه والموقع )</span>" },
+                    { code: "10-4", pronunciation: "تن - فور", meaning: "علم او صحيح", example: "-" },
+                    { code: "10-5", pronunciation: "تن - فايف", meaning: "سرقة سياره", example: "<span class='code-red'>( يونت ) تو دسباتش امامي حالة 10-5 احتاج 3-20</span>" },
+                    { code: "10-6", pronunciation: "تن - سكس", meaning: "سرقة منزل", example: "<span class='code-red'>( يونت ) تو دسباتش يوجد 10-6</span>" },
+                    { code: "10-7", pronunciation: "تن - سفن", meaning: "سرقة بقاله", example: "<span class='code-red'>( يونت ) تو دسباتش يوجد 10-7</span>" },
+                    { code: "10-8", pronunciation: "تن - ايت", meaning: "سرقة مجوهرات", example: "<span class='code-red'>( يونت ) تو دسباتش يوجد 10-8</span>" },
+                    { code: "10-9", pronunciation: "تن - ناين", meaning: "سرقة مصرف", example: "<span class='code-red'>( يونت ) تو دسباتش يوجد 10-9</span>" },
+                    { code: "10-10", pronunciation: "تن - تن", meaning: "سرقة المغسلة ( Laundry Robbery )", example: "<span class='code-red'>( يونت ) تو دسباتش يوجد 10-10</span>" },
+                    { code: "10-11", pronunciation: "تن - ايليفن", meaning: "سرقة كاش إكستشينج ( Cash Exchange Robbery )", example: "<span class='code-red'>( يونت ) تو دسباتش يوجد 10-11</span>" },
+                    { code: "10-12", pronunciation: "تن - تويلف", meaning: "سرقة الكونتينر ( Amnu Containers )", example: "<span class='code-red'>( يونت ) تو دسباتش يوجد 10-12</span>" },
+                    { code: "10-13", pronunciation: "تن - ثرتين", meaning: "سرقة متحف الفنون ( Art Asylum )", example: "<span class='code-red'>( يونت ) تو دسباتش يوجد 10-13</span>" },
+                    { code: "10-14", pronunciation: "تن - فورتين", meaning: "سرقة البوبكات ( Bobcat Security )", example: "<span class='code-red'>( يونت ) تو دسباتش يوجد 10-14</span>" },
+                    { code: "10-15", pronunciation: "تن - فيفتين", meaning: "سرقة الميزبانك ( Maze Bank )", example: "<span class='code-red'>( يونت ) تو دسباتش يوجد 10-15</span>" },
+                    { code: "10-16", pronunciation: "تن - سكستين", meaning: "سرقة الكازينو ( Diamond Casino )", example: "<span class='code-red'>( يونت ) تو دسباتش يوجد 10-16</span>" },
+                    { code: "10-17", pronunciation: "تن - سفنتين", meaning: "سرقة البنك المركزي ( Pacific Bank )", example: "<span class='code-red'>( يونت ) تو دسباتش يوجد 10-17</span>" },
+                    { code: "10-18", pronunciation: "تن - ايتين", meaning: "سرقة بنك باليتو ( Paleto Bank )", example: "<span class='code-red'>( يونت ) تو دسباتش يوجد 10-18</span>" },
+                    { code: "10-19", pronunciation: "تن - نايتنين", meaning: "مطاردة على الأقدام", example: "<span class='code-red'>( يونت ) تو دسباتش لاست 1-10 تحولت 19-10</span>" },
+                    { code: "10-20", pronunciation: "تن - توينتي", meaning: "موقعك", example: "<span class='code-red'>( يونت ) تو دسباتش 20-10</span>" },
+                    { code: "20-2", pronunciation: "توينتي - تو", meaning: "شوت فاير", example: "<span class='code-red'>( يونت ) تو دسباتش لاست 7-10 تحولت إلى 2-20</span>" },
+                    { code: "20-3", pronunciation: "توينتي - ثري", meaning: "احتاج دعم", example: "<span class='code-red'>( يونت ) تو دسباتش احتاج 3-20 لاست 1-10</span>" }
+                ]
+            }
+        ];
+
+        let rosterData = [];
+        let protocolsData = [];
+
+        // App Initialization
+        window.onload = function() {
+            // Load Roster Data
+            const savedRoster = localStorage.getItem('LSPD_ROSTER_DATA');
+            if (savedRoster) {
+                try { rosterData = JSON.parse(savedRoster); } catch(e) { rosterData = parseRosterText(initialRosterDataset); }
+            } else {
+                rosterData = parseRosterText(initialRosterDataset);
+            }
+
+            // Load Protocols Data
+            const savedProtocols = localStorage.getItem('LSPD_PROTOCOLS_DATA');
+            if (savedProtocols) {
+                try { protocolsData = JSON.parse(savedProtocols); } catch(e) { protocolsData = JSON.parse(JSON.stringify(initialProtocolsDataset)); }
+            } else {
+                protocolsData = JSON.parse(JSON.stringify(initialProtocolsDataset));
+            }
+
+            // Check Session Admin Status
+            if (sessionStorage.getItem('LSPD_ADMIN_AUTH') === 'true') {
+                isAdminUnlocked = true;
+            }
+
+            populateRankDropdowns();
+            updateAdminUIState();
+            renderRosterTable();
+            renderProtocolsUI();
+
+            // Outside click handler for export dropdown
+            document.addEventListener('click', (e) => {
+                const container = document.getElementById('export-dropdown-container');
+                if (container && !container.contains(e.target)) {
+                    document.getElementById('export-menu').classList.add('hidden');
+                }
+            });
+        };
+
+        // Tab Switching Logic
+        function switchTab(tab) {
+            activeTab = tab;
+            const rosterSec = document.getElementById('section-roster');
+            const protocolsSec = document.getElementById('section-protocols');
+            const rosterBtn = document.getElementById('tab-roster-btn');
+            const protocolsBtn = document.getElementById('tab-protocols-btn');
+
+            if (tab === 'roster') {
+                rosterSec.classList.remove('hidden');
+                protocolsSec.classList.add('hidden');
+                rosterBtn.classList.add('active');
+                protocolsBtn.classList.remove('active');
+            } else {
+                rosterSec.classList.add('hidden');
+                protocolsSec.classList.remove('hidden');
+                protocolsBtn.classList.add('active');
+                rosterBtn.classList.remove('active');
+            }
+        }
+
+        // Admin Auth Toggle & Updates
+        function toggleAdminAuth() {
+            if (isAdminUnlocked) {
+                if (confirm("هل تريد تسجيل الخروج من وضع المشرف وقفل التعديل؟")) {
+                    isAdminUnlocked = false;
+                    sessionStorage.removeItem('LSPD_ADMIN_AUTH');
+                    updateAdminUIState();
+                    showToast('تم الخروج من وضع المشرف');
+                }
+            } else {
+                document.getElementById('adminPasswordInput').value = '';
+                document.getElementById('passwordError').classList.add('hidden');
+                document.getElementById('passwordModal').classList.remove('hidden');
+                document.getElementById('adminPasswordInput').focus();
+            }
+        }
+
+        function closePasswordModal() {
+            document.getElementById('passwordModal').classList.add('hidden');
+        }
+
+        function submitAdminAuth() {
+            const inputPass = document.getElementById('adminPasswordInput').value;
+            if (inputPass === adminPasscode) {
+                isAdminUnlocked = true;
+                sessionStorage.setItem('LSPD_ADMIN_AUTH', 'true');
+                closePasswordModal();
+                updateAdminUIState();
+                showToast('🔓 تم دخول المشرف وتفعيل الصلاحيات الكاملة');
+            } else {
+                document.getElementById('passwordError').classList.remove('hidden');
+            }
+        }
+
+        function updateAdminUIState() {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            const btnIcon = document.getElementById('authBtnIcon');
+            const btnText = document.getElementById('authBtnText');
+            const btn = document.getElementById('authBtn');
+
+            const rosterActions = document.getElementById('roster-admin-actions');
+            const thRosterActions = document.getElementById('th-roster-actions');
+            const protocolActions = document.getElementById('protocol-admin-actions');
+
+            if (isAdminUnlocked) {
+                statusDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse";
+                statusText.innerText = "وضع المشرف (صلاحيات كاملة)";
+                btnIcon.className = "fa-solid fa-lock-open text-emerald-400";
+                btnText.innerText = "تسجيل الخروج";
+                btn.className = "flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-700 hover:bg-rose-600 text-white text-xs font-bold transition-all duration-200 shadow-md";
+
+                rosterActions.classList.remove('hidden');
+                rosterActions.classList.add('flex');
+                thRosterActions.classList.remove('hidden');
+
+                protocolActions.classList.remove('hidden');
+                protocolActions.classList.add('flex');
+            } else {
+                statusDot.className = "w-2.5 h-2.5 rounded-full bg-amber-500";
+                statusText.innerText = "وضع العرض (قراءة فقط)";
+                btnIcon.className = "fa-solid fa-lock text-amber-300";
+                btnText.innerText = "دخول المشرف";
+                btn.className = "flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all duration-200 shadow-md";
+
+                rosterActions.classList.add('hidden');
+                rosterActions.classList.remove('flex');
+                thRosterActions.classList.add('hidden');
+
+                protocolActions.classList.add('hidden');
+                protocolActions.classList.remove('flex');
+            }
+
+            renderRosterTable();
+            renderProtocolsUI();
+        }
+
+        // ==================== ROSTER MODULE LOGIC ====================
+
+        function parseRosterText(text) {
+            const lines = text.split(/\r?\n/);
+            const parsed = [];
+            let currentRank = "Cadet";
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line || line.startsWith("Code\t")) continue;
+
+                const matchedRank = RANKS_ORDER.find(r => r.toLowerCase() === line.toLowerCase());
+                if (matchedRank) {
+                    currentRank = matchedRank;
+                    continue;
+                }
+
+                const parts = lines[i].split('\t');
+                if (parts.length >= 1) {
+                    const code = (parts[0] || '').trim();
+                    if (!code && !parts[1]) continue;
+
+                    parsed.push({
+                        id: 'id_' + Math.random().toString(36).substr(2, 9),
+                        sectionRank: currentRank,
+                        code: code,
+                        discordName: (parts[1] || '').trim(),
+                        rankIcon: (parts[2] || '').trim(),
+                        rank: (parts[3] || '').trim(),
+                        vp: (parts[4] || '').trim(),
+                        lastPromotion: (parts[5] || '').trim(),
+                        points: (parts[6] || '').trim(),
+                        sector: (parts[7] || '').trim(),
+                        adminRank: (parts[8] || '').trim() || 'NONE',
+                        fto: isChecked(parts[9]),
+                        interceptor: isChecked(parts[10]),
+                        airship: isChecked(parts[11]),
+                        motorcycle: isChecked(parts[12]),
+                        negotiation: isChecked(parts[13]),
+                        discordId: (parts[14] || '').trim()
+                    });
+                }
+            }
+            return parsed;
+        }
+
+        function isChecked(val) {
+            if (!val) return false;
+            val = val.trim();
+            return val === '✔' || val === 'true' || val === '1' || val === 'X' || val === 'x';
+        }
+
+        function saveRosterData() {
+            localStorage.setItem('LSPD_ROSTER_DATA', JSON.stringify(rosterData));
+        }
+
+        function populateRankDropdowns() {
+            const filterRank = document.getElementById('roster-filter-rank');
+            const formRank = document.getElementById('form-rank');
+            filterRank.innerHTML = '<option value="">جميع الرتب (All Ranks)</option>';
+            formRank.innerHTML = '';
+            RANKS_ORDER.forEach(rank => {
+                filterRank.innerHTML += `<option value="${rank}">${rank}</option>`;
+                formRank.innerHTML += `<option value="${rank}">${rank}</option>`;
+            });
+        }
+
+        function renderRosterTable() {
+            const tbody = document.getElementById('roster-tbody');
+            const search = (document.getElementById('roster-search').value || '').toLowerCase().trim();
+            const filterRank = document.getElementById('roster-filter-rank').value;
+            const filterAdmin = document.getElementById('roster-filter-admin').value;
+
+            tbody.innerHTML = '';
+            const grouped = {};
+            RANKS_ORDER.forEach(r => grouped[r] = []);
+
+            rosterData.forEach(item => {
+                const matchesSearch = !search || 
+                    (item.discordName && item.discordName.toLowerCase().includes(search)) ||
+                    (item.code && item.code.toLowerCase().includes(search)) ||
+                    (item.discordId && item.discordId.includes(search)) ||
+                    (item.adminRank && item.adminRank.toLowerCase().includes(search));
+
+                const matchesRank = !filterRank || item.sectionRank === filterRank;
+                let matchesAdmin = true;
+                if (filterAdmin === 'NONE') matchesAdmin = (!item.adminRank || item.adminRank === 'NONE');
+                else if (filterAdmin === 'SPECIAL') matchesAdmin = (item.adminRank && item.adminRank !== 'NONE');
+
+                if (matchesSearch && matchesRank && matchesAdmin) {
+                    const rKey = RANKS_ORDER.includes(item.sectionRank) ? item.sectionRank : 'Cadet';
+                    grouped[rKey].push(item);
+                }
+            });
+
+            let totalRendered = 0;
+
+            RANKS_ORDER.forEach(rank => {
+                const items = grouped[rank];
+                if (!items || items.length === 0) return;
+
+                const headerTr = document.createElement('tr');
+                headerTr.className = "bg-[#1e293b]/80 border-y border-slate-700 text-amber-400 font-bold font-mono tracking-wider";
+                headerTr.innerHTML = `
+                    <td colspan="${isAdminUnlocked ? '13' : '12'}" class="py-2.5 px-4 text-right">
+                        <div class="flex items-center justify-between">
+                            <span class="flex items-center gap-2">
+                                <i class="fa-solid fa-layer-group text-xs text-amber-500"></i>
+                                <span>${rank}</span>
+                            </span>
+                            <span class="text-[10px] bg-[#0b0f17] px-2.5 py-0.5 rounded-full text-slate-400 border border-slate-700">${items.length} أفراد</span>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(headerTr);
+
+                items.forEach(item => {
+                    totalRendered++;
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-800/50 transition-colors border-b border-slate-800/40";
+                    
+                    let adminBadge = `<span class="text-slate-400">${escapeHtml(item.adminRank || 'NONE')}</span>`;
+                    if (item.adminRank && item.adminRank !== 'NONE') {
+                        if (item.adminRank.includes('Commander') || item.adminRank.includes('Head')) {
+                            adminBadge = `<span class="bg-blue-950 text-blue-300 border border-blue-700 px-2 py-0.5 rounded font-semibold text-[11px]">${escapeHtml(item.adminRank)}</span>`;
+                        } else {
+                            adminBadge = `<span class="bg-amber-950 text-amber-300 border border-amber-700 px-2 py-0.5 rounded font-semibold text-[11px]">${escapeHtml(item.adminRank)}</span>`;
+                        }
+                    }
+
+                    const isVacant = !item.discordName || item.discordName.trim() === '' || item.discordName.trim() === 'شاغر';
+                    const nameDisplay = isVacant 
+                        ? `<span class="text-slate-500 bg-[#0b0f17] px-2 py-0.5 rounded border border-slate-800 text-xs italic">شاغر</span>` 
+                        : `<span class="text-white font-semibold">${escapeHtml(item.discordName)}</span>`;
+
+                    let rowHTML = `
+                        <td class="py-2.5 px-3 text-center font-mono font-bold text-amber-400/90 border-l border-slate-800/40">${escapeHtml(item.code || '-')}</td>
+                        <td class="py-2.5 px-3 border-l border-slate-800/40 font-semibold">${nameDisplay}</td>
+                        <td class="py-2.5 px-3 text-center border-l border-slate-800/40 text-amber-400 font-bold">${escapeHtml(item.rankIcon || '')}</td>
+                        <td class="py-2.5 px-3 text-center border-l border-slate-800/40 font-mono text-emerald-400 font-medium">${escapeHtml(item.points || '')}</td>
+                        <td class="py-2.5 px-3 text-center border-l border-slate-800/40 text-slate-300">${escapeHtml(item.sector || '-')}</td>
+                        <td class="py-2.5 px-3 border-l border-slate-800/40">${adminBadge}</td>
+                        <td class="py-2.5 px-3 text-center border-l border-slate-800/40">${renderCertIcon(item.fto)}</td>
+                        <td class="py-2.5 px-3 text-center border-l border-slate-800/40">${renderCertIcon(item.interceptor)}</td>
+                        <td class="py-2.5 px-3 text-center border-l border-slate-800/40">${renderCertIcon(item.airship)}</td>
+                        <td class="py-2.5 px-3 text-center border-l border-slate-800/40">${renderCertIcon(item.motorcycle)}</td>
+                        <td class="py-2.5 px-3 text-center border-l border-slate-800/40">${renderCertIcon(item.negotiation)}</td>
+                        <td class="py-2.5 px-3 border-l border-slate-800/40 font-mono text-[11px] text-slate-400">${escapeHtml(item.discordId || '-')}</td>
+                    `;
+
+                    if (isAdminUnlocked) {
+                        rowHTML += `
+                            <td class="py-2.5 px-3 text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <button onclick="editRosterRecord('${item.id}')" title="تعديل" class="text-blue-400 hover:text-blue-300 p-1"><i class="fa-solid fa-pen-to-square"></i></button>
+                                    <button onclick="deleteRosterRecord('${item.id}')" title="حذف" class="text-rose-400 hover:text-rose-300 p-1"><i class="fa-solid fa-trash-can"></i></button>
+                                </div>
+                            </td>
+                        `;
+                    }
+
+                    tr.innerHTML = rowHTML;
+                    tbody.appendChild(tr);
+                });
+            });
+
+            if (totalRendered === 0) {
+                tbody.innerHTML = `<tr><td colspan="13" class="py-12 text-center text-slate-500"><i class="fa-solid fa-folder-open text-3xl mb-2 block"></i><span>لا توجد بيانات مطابقة للبحث</span></td></tr>`;
+            }
+        }
+
+        function renderCertIcon(state) {
+            return state ? `<i class="fa-solid fa-circle-check text-emerald-400 text-sm"></i>` : `<i class="fa-solid fa-minus text-slate-700 text-xs"></i>`;
+        }
+
+        function openRosterModal(isEdit = false) {
+            if (!isAdminUnlocked) return;
+            document.getElementById('rosterModal').classList.remove('hidden');
+            if (!isEdit) {
+                document.getElementById('roster-modal-title').innerText = "إضافة فرد جديد";
+                document.getElementById('roster-form').reset();
+                document.getElementById('roster-edit-id').value = '';
+            }
+        }
+
+        function closeRosterModal() {
+            document.getElementById('rosterModal').classList.add('hidden');
+        }
+
+        function editRosterRecord(id) {
+            if (!isAdminUnlocked) return;
+            const item = rosterData.find(d => d.id === id);
+            if (!item) return;
+            document.getElementById('roster-modal-title').innerText = "تعديل بيانات (" + (item.code || item.discordName) + ")";
+            document.getElementById('roster-edit-id').value = item.id;
+            document.getElementById('form-rank').value = item.sectionRank || 'Cadet';
+            document.getElementById('form-code').value = item.code || '';
+            document.getElementById('form-name').value = item.discordName || '';
+            document.getElementById('form-discord-id').value = item.discordId || '';
+            document.getElementById('form-rank-icon').value = item.rankIcon || '';
+            document.getElementById('form-points').value = item.points || '';
+            document.getElementById('form-sector').value = item.sector || '';
+            document.getElementById('form-admin-rank').value = item.adminRank || 'NONE';
+            document.getElementById('form-fto').checked = item.fto;
+            document.getElementById('form-interceptor').checked = item.interceptor;
+            document.getElementById('form-airship').checked = item.airship;
+            document.getElementById('form-motorcycle').checked = item.motorcycle;
+            document.getElementById('form-negotiation').checked = item.negotiation;
+            openRosterModal(true);
+        }
+
+        function handleRosterFormSubmit(e) {
+            e.preventDefault();
+            if (!isAdminUnlocked) return;
+            const editId = document.getElementById('roster-edit-id').value;
+            const recordObj = {
+                id: editId ? editId : 'id_' + Math.random().toString(36).substr(2, 9),
+                sectionRank: document.getElementById('form-rank').value,
+                code: document.getElementById('form-code').value.trim(),
+                discordName: document.getElementById('form-name').value.trim(),
+                discordId: document.getElementById('form-discord-id').value.trim(),
+                rankIcon: document.getElementById('form-rank-icon').value.trim(),
+                points: document.getElementById('form-points').value.trim(),
+                sector: document.getElementById('form-sector').value.trim(),
+                adminRank: document.getElementById('form-admin-rank').value.trim() || 'NONE',
+                fto: document.getElementById('form-fto').checked,
+                interceptor: document.getElementById('form-interceptor').checked,
+                airship: document.getElementById('form-airship').checked,
+                motorcycle: document.getElementById('form-motorcycle').checked,
+                negotiation: document.getElementById('form-negotiation').checked
+            };
+
+            if (editId) {
+                const idx = rosterData.findIndex(d => String(d.id) === String(editId));
+                if (idx !== -1) rosterData[idx] = recordObj;
+                showToast("تم تحديث البيانات بنجاح!");
+            } else {
+                rosterData.push(recordObj);
+                showToast("تمت إضافة الفرد بنجاح!");
+            }
+            saveRosterData();
+            renderRosterTable();
+            closeRosterModal();
+        }
+
+        function deleteRosterRecord(id) {
+            if (!isAdminUnlocked) return;
+            if (confirm("هل أنت متأكد من حذف هذا السجل؟")) {
+                rosterData = rosterData.filter(d => String(d.id) !== String(id));
+                saveRosterData();
+                renderRosterTable();
+                showToast("تم حذف السجل");
+            }
+        }
+
+        function resetNamesToVacant() {
+            if (!isAdminUnlocked) return;
+            if (confirm("تفريغ كافة الأسماء وجعلها (شاغر)؟")) {
+                rosterData.forEach(d => { d.discordName = "شاغر"; });
+                saveRosterData();
+                renderRosterTable();
+                showToast("تم تفريغ الأسماء بنجاح");
+            }
+        }
+
+        function clearAllRosterData() {
+            if (!isAdminUnlocked) return;
+            if (confirm("⚠️ تحذير: مسح كل السجلات نهائياً؟")) {
+                rosterData = [];
+                saveRosterData();
+                renderRosterTable();
+                showToast("تم مسح البيانات");
+            }
+        }
+
+        function handleRosterFileUpload(event) {
+            if (!isAdminUnlocked) return;
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const parsed = parseRosterText(e.target.result);
+                if (parsed.length > 0) {
+                    rosterData = parsed;
+                    saveRosterData();
+                    renderRosterTable();
+                    showToast(`تم استيراد ${parsed.length} سجل بنجاح!`);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function toggleExportMenu() { document.getElementById('export-menu').classList.toggle('hidden'); }
+
+        function generateExportArray() {
+            const rows = [["Code", "Discord Name", "Rank Icon", "Rank", "V.P", "Last Promotion", "Points", "Sector or Teams", "Administrator Ranks", "FTO", "Interceptor", "AirShip", "Motorcycle", "Negotiation", "DISCORD ID"]];
+            RANKS_ORDER.forEach(rank => {
+                const items = rosterData.filter(d => (d.sectionRank || 'Cadet') === rank);
+                if (items.length > 0) {
+                    rows.push([rank]);
+                    items.forEach(d => {
+                        rows.push([d.code||'', d.discordName||'', d.rankIcon||'', d.rank||'', d.vp||'', d.lastPromotion||'', d.points||'', d.sector||'', d.adminRank||'NONE', d.fto?'✔':'', d.interceptor?'✔':'', d.airship?'✔':'', d.motorcycle?'✔':'', d.negotiation?'✔':'', d.discordId||'']);
+                    });
+                }
+            });
+            return rows;
+        }
+
+        function exportToExcel() {
+            const rows = generateExportArray();
+            const ws = XLSX.utils.aoa_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "LSPD Roster");
+            XLSX.writeFile(wb, "LSPD_Roster_Export.xlsx");
+            toggleExportMenu();
+        }
+
+        function exportToCSV() {
+            const rows = generateExportArray();
+            const blob = new Blob([rows.map(e => e.join("\t")).join("\n")], { type: 'text/tab-separated-values;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "LSPD_Roster_Export.txt";
+            link.click();
+            toggleExportMenu();
+        }
+
+        function copyToClipboard() {
+            const rows = generateExportArray();
+            const textarea = document.createElement("textarea");
+            textarea.value = rows.map(e => e.join("\t")).join("\n");
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            showToast("تم نسخ البيانات للحافظة");
+            toggleExportMenu();
+        }
+
+        // ==================== PROTOCOLS MODULE LOGIC ====================
+
+        function saveProtocolsData() {
+            localStorage.setItem('LSPD_PROTOCOLS_DATA', JSON.stringify(protocolsData));
+            renderProtocolsUI();
+        }
+
+        function renderProtocolsUI() {
+            const container = document.getElementById('protocolsContainer');
+            const searchVal = (document.getElementById('protocol-search').value || '').trim().toLowerCase();
+            container.innerHTML = '';
+
+            let totalCount = 0;
+
+            protocolsData.forEach((category, catIndex) => {
+                const filteredCodes = category.codes.filter(c => {
+                    const searchable = `${c.code} ${c.pronunciation} ${c.meaning} ${c.example}`.toLowerCase();
+                    return searchable.includes(searchVal);
+                });
+
+                totalCount += filteredCodes.length;
+
+                const section = document.createElement('section');
+                section.className = "bg-[#131b2a] border border-slate-800 rounded-xl overflow-hidden shadow-xl transition";
+
+                let headerHtml = `
+                    <div class="bg-[#0b0f17] border-b border-slate-800 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+                        <div class="flex items-center gap-3">
+                            <h2 class="text-base font-bold text-slate-100 tracking-wide">${escapeHtml(category.categoryTitle)}</h2>
+                            <span class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-amber-400 border border-slate-700 font-semibold">${filteredCodes.length} كود</span>
+                        </div>
+                        ${isAdminUnlocked ? `
+                            <div class="flex items-center gap-2">
+                                <div class="flex items-center bg-[#131b2a] border border-slate-700 rounded-lg p-0.5 ml-2">
+                                    <button onclick="moveCategory(${catIndex}, -1)" title="تحريك القسم لأعلى" class="w-7 h-7 rounded hover:bg-slate-700 text-slate-300 hover:text-white transition flex items-center justify-center ${catIndex === 0 ? 'opacity-30 cursor-not-allowed' : ''}" ${catIndex === 0 ? 'disabled' : ''}>
+                                        <i class="fa-solid fa-arrow-up text-xs"></i>
+                                    </button>
+                                    <button onclick="moveCategory(${catIndex}, 1)" title="تحريك القسم لأسفل" class="w-7 h-7 rounded hover:bg-slate-700 text-slate-300 hover:text-white transition flex items-center justify-center ${catIndex === protocolsData.length - 1 ? 'opacity-30 cursor-not-allowed' : ''}" ${catIndex === protocolsData.length - 1 ? 'disabled' : ''}>
+                                        <i class="fa-solid fa-arrow-down text-xs"></i>
+                                    </button>
+                                </div>
+                                <button onclick="openRenameCategoryModal(${catIndex})" class="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+                                    <i class="fa-solid fa-pen-to-square ml-1"></i> تسمية
+                                </button>
+                                <button onclick="openProtocolModal(${catIndex})" class="text-xs px-2.5 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-white font-semibold transition">
+                                    <i class="fa-solid fa-plus ml-1"></i> إضافة كود
+                                </button>
+                                <button onclick="deleteCategory(${catIndex})" class="text-xs px-2.5 py-1 rounded bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800/40 transition">
+                                    <i class="fa-solid fa-trash ml-1"></i> حذف القسم
+                                </button>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+
+                let tableHtml = `
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right text-xs">
+                            <thead class="bg-[#0b0f17]/60 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-800">
+                                <tr>
+                                    <th scope="col" class="py-3.5 px-4 font-bold border-l border-slate-800 text-center w-28">البلاغ</th>
+                                    <th scope="col" class="py-3.5 px-4 font-bold border-l border-slate-800 text-center w-36">طريقة النطق</th>
+                                    <th scope="col" class="py-3.5 px-4 font-bold border-l border-slate-800">المعنى</th>
+                                    <th scope="col" class="py-3.5 px-4 font-bold ${isAdminUnlocked ? 'border-l border-slate-800' : ''}">مثال</th>
+                                    ${isAdminUnlocked ? '<th scope="col" class="py-3.5 px-4 font-bold text-center w-36">إجراءات والترتيب</th>' : ''}
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/60 text-slate-300">
+                `;
+
+                if (filteredCodes.length === 0) {
+                    tableHtml += `
+                        <tr>
+                            <td colspan="${isAdminUnlocked ? 5 : 4}" class="py-8 text-center text-slate-500 text-xs">
+                                لا توجد أكواد مطابقة للبحث
+                            </td>
+                        </tr>
+                    `;
+                } else {
+                    filteredCodes.forEach((item, codeIndex) => {
+                        const realCodeIndex = category.codes.indexOf(item);
+                        const isFirst = realCodeIndex === 0;
+                        const isLast = realCodeIndex === category.codes.length - 1;
+
+                        tableHtml += `
+                            <tr class="hover:bg-slate-800/40 transition duration-150">
+                                <td class="py-3 px-4 font-bold text-center border-l border-slate-800/80 text-white whitespace-nowrap bg-[#0b0f17]/30">
+                                    <span class="inline-block px-2.5 py-1 rounded bg-slate-800/80 border border-slate-700/60 font-mono tracking-wider text-amber-400">
+                                        ${escapeHtml(item.code)}
+                                    </span>
+                                </td>
+                                <td class="py-3 px-4 text-center border-l border-slate-800/80 text-slate-300 font-medium">
+                                    ${escapeHtml(item.pronunciation || '-')}
+                                </td>
+                                <td class="py-3 px-4 border-l border-slate-800/80 leading-relaxed font-semibold">
+                                    ${escapeHtml(item.meaning || '-')}
+                                </td>
+                                <td class="py-3 px-4 ${isAdminUnlocked ? 'border-l border-slate-800/80' : ''} leading-relaxed font-medium">
+                                    ${item.example ? item.example : '-'}
+                                </td>
+                                ${isAdminUnlocked ? `
+                                    <td class="py-3 px-4 text-center">
+                                        <div class="flex items-center justify-center gap-1.5">
+                                            <div class="flex items-center bg-[#0b0f17] border border-slate-800 rounded-lg p-0.5">
+                                                <button onclick="moveCode(${catIndex}, ${realCodeIndex}, -1)" title="تحريك للأعلى" class="w-6 h-6 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition flex items-center justify-center ${isFirst ? 'opacity-30 cursor-not-allowed' : ''}" ${isFirst ? 'disabled' : ''}>
+                                                    <i class="fa-solid fa-chevron-up text-[10px]"></i>
+                                                </button>
+                                                <button onclick="moveCode(${catIndex}, ${realCodeIndex}, 1)" title="تحريك للأسفل" class="w-6 h-6 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition flex items-center justify-center ${isLast ? 'opacity-30 cursor-not-allowed' : ''}" ${isLast ? 'disabled' : ''}>
+                                                    <i class="fa-solid fa-chevron-down text-[10px]"></i>
+                                                </button>
+                                            </div>
+                                            <button onclick="openEditProtocolModal(${catIndex}, ${realCodeIndex})" title="تعديل" class="w-7 h-7 rounded-lg bg-blue-950/50 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-800/50 transition flex items-center justify-center">
+                                                <i class="fa-solid fa-pen text-xs"></i>
+                                            </button>
+                                            <button onclick="deleteProtocolCode(${catIndex}, ${realCodeIndex})" title="حذف" class="w-7 h-7 rounded-lg bg-rose-950/50 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-800/50 transition flex items-center justify-center">
+                                                <i class="fa-solid fa-trash text-xs"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                ` : ''}
+                            </tr>
+                        `;
+                    });
+                }
+
+                tableHtml += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+
+                section.innerHTML = headerHtml + tableHtml;
+                container.appendChild(section);
+            });
+
+            document.getElementById('totalCodesCount').innerText = totalCount;
+        }
+
+        // Category Management Functions
+        function openAddCategoryModal() {
+            const title = prompt("أدخل اسم القسم الجديد:");
+            if (title && title.trim() !== '') {
+                protocolsData.push({ categoryTitle: title.trim(), codes: [] });
+                saveProtocolsData();
+                showToast('تمت إضافة القسم الجديد بنجاح');
+            }
+        }
+
+        function openRenameCategoryModal(catIndex) {
+            document.getElementById('renameCategoryIndex').value = catIndex;
+            document.getElementById('renameCategoryInput').value = protocolsData[catIndex].categoryTitle;
+            document.getElementById('renameCategoryModal').classList.remove('hidden');
+        }
+
+        function closeRenameCategoryModal() {
+            document.getElementById('renameCategoryModal').classList.add('hidden');
+        }
+
+        function saveCategoryName() {
+            const catIndex = document.getElementById('renameCategoryIndex').value;
+            const newTitle = document.getElementById('renameCategoryInput').value.trim();
+            if (newTitle && protocolsData[catIndex]) {
+                protocolsData[catIndex].categoryTitle = newTitle;
+                saveProtocolsData();
+                closeRenameCategoryModal();
+                showToast('تم تعديل اسم القسم');
+            }
+        }
+
+        function deleteCategory(catIndex) {
+            if (confirm(`هل أنت تأكد من حذف قسم "${protocolsData[catIndex].categoryTitle}" بالكامل؟`)) {
+                protocolsData.splice(catIndex, 1);
+                saveProtocolsData();
+                showToast('تم حذف القسم بنجاح');
+            }
+        }
+
+        function moveCategory(catIndex, direction) {
+            const targetIndex = catIndex + direction;
+            if (targetIndex < 0 || targetIndex >= protocolsData.length) return;
+            const temp = protocolsData[catIndex];
+            protocolsData[catIndex] = protocolsData[targetIndex];
+            protocolsData[targetIndex] = temp;
+            saveProtocolsData();
+            showToast('تم إعادة ترتيب الأقسام');
+        }
+
+        function moveCode(catIndex, codeIndex, direction) {
+            const codes = protocolsData[catIndex].codes;
+            const targetIndex = codeIndex + direction;
+            if (targetIndex < 0 || targetIndex >= codes.length) return;
+            const temp = codes[codeIndex];
+            codes[codeIndex] = codes[targetIndex];
+            codes[targetIndex] = temp;
+            saveProtocolsData();
+            showToast('تم إعادة ترتيب الأكواد');
+        }
+
+        // Protocol Code Management Functions
+        function populateCategoryDropdown(selectedIndex = 0) {
+            const select = document.getElementById('modalCategorySelect');
+            select.innerHTML = '';
+            protocolsData.forEach((cat, idx) => {
+                const opt = document.createElement('option');
+                opt.value = idx;
+                opt.textContent = cat.categoryTitle;
+                if (idx === selectedIndex) opt.selected = true;
+                select.appendChild(opt);
+            });
+        }
+
+        function openProtocolModal(catIndex = 0) {
+            document.getElementById('protocolModalTitle').innerText = "إضافة كود جديد";
+            document.getElementById('editCategoryIndex').value = "";
+            document.getElementById('editCodeIndex').value = "";
+            document.getElementById('modalCode').value = "";
+            document.getElementById('modalPronunciation').value = "";
+            document.getElementById('modalMeaning').value = "";
+            document.getElementById('modalExample').value = "";
+
+            populateCategoryDropdown(catIndex);
+            document.getElementById('protocolModal').classList.remove('hidden');
+        }
+
+        function openEditProtocolModal(catIndex, codeIndex) {
+            const item = protocolsData[catIndex].codes[codeIndex];
+            document.getElementById('protocolModalTitle').innerText = "تعديل الكود";
+            document.getElementById('editCategoryIndex').value = catIndex;
+            document.getElementById('editCodeIndex').value = codeIndex;
+            document.getElementById('modalCode').value = item.code || '';
+            document.getElementById('modalPronunciation').value = item.pronunciation || '';
+            document.getElementById('modalMeaning').value = item.meaning || '';
+            document.getElementById('modalExample').value = item.example || '';
+
+            populateCategoryDropdown(catIndex);
+            document.getElementById('protocolModal').classList.remove('hidden');
+        }
+
+        function closeProtocolModal() {
+            document.getElementById('protocolModal').classList.add('hidden');
+        }
+
+        function saveProtocolForm(e) {
+            e.preventDefault();
+
+            const targetCatIndex = parseInt(document.getElementById('modalCategorySelect').value);
+            const editCatIndex = document.getElementById('editCategoryIndex').value;
+            const editCodeIndex = document.getElementById('editCodeIndex').value;
+
+            const newCodeData = {
+                code: document.getElementById('modalCode').value.trim(),
+                pronunciation: document.getElementById('modalPronunciation').value.trim(),
+                meaning: document.getElementById('modalMeaning').value.trim(),
+                example: document.getElementById('modalExample').value.trim()
+            };
+
+            if (editCatIndex !== "" && editCodeIndex !== "") {
+                const oldCat = parseInt(editCatIndex);
+                const oldIdx = parseInt(editCodeIndex);
+
+                if (oldCat === targetCatIndex) {
+                    protocolsData[oldCat].codes[oldIdx] = newCodeData;
+                } else {
+                    protocolsData[oldCat].codes.splice(oldIdx, 1);
+                    protocolsData[targetCatIndex].codes.push(newCodeData);
+                }
+                showToast('تم تعديل الكود بنجاح');
+            } else {
+                if (protocolsData[targetCatIndex]) {
+                    protocolsData[targetCatIndex].codes.push(newCodeData);
+                    showToast('تمت إضافة الكود بنجاح');
+                }
+            }
+
+            saveProtocolsData();
+            closeProtocolModal();
+        }
+
+        function deleteProtocolCode(catIndex, codeIndex) {
+            if (confirm('هل أنت تأكد من حذف هذا الكود؟')) {
+                protocolsData[catIndex].codes.splice(codeIndex, 1);
+                saveProtocolsData();
+                showToast('تم حذف الكود');
+            }
+        }
+
+        function resetProtocolsToDefaults() {
+            if (confirm('هل تريد استعادة كافة الأكواد والبروتوكولات الافتراضية؟')) {
+                protocolsData = JSON.parse(JSON.stringify(initialProtocolsDataset));
+                saveProtocolsData();
+                showToast('تم استعادة البيانات الأصلية للراديو بنجاح');
+            }
+        }
+
+        // Helper Utilities
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').innerText = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
